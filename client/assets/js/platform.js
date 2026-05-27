@@ -6,7 +6,7 @@
 
 	function getApiBase() {
 		if (window.NOXGAR_API_BASE) return window.NOXGAR_API_BASE;
-		if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+		if (location.port === '3000' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
 			return `${location.protocol}//${location.hostname}:3001`;
 		}
 		return location.origin;

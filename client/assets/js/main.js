@@ -536,7 +536,8 @@
 		0xFE: new Uint8Array([0xFE])
 	};
 
-	const SERVERS = ['127.0.0.1:8080'];
+	const LOCAL_GAME_SERVER = `${window.location.hostname || '127.0.0.1'}:8080`;
+	const SERVERS = [LOCAL_GAME_SERVER];
 	const GEO = {'eu': SERVERS[0], 'us': SERVERS[0]};
 
 	const KEY_TO_OPCODE = {

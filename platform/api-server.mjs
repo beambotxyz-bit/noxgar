@@ -4,6 +4,7 @@ import { openDatabase, getPlayerProfile, upsertTelegramPlayer } from "./database
 import { verifyTelegramInitData } from "./telegram-auth.mjs";
 
 const PORT = Number(process.env.NOXGAR_API_PORT || 3001);
+const HOST = process.env.NOXGAR_API_HOST || "0.0.0.0";
 const DATABASE_PATH = process.env.NOXGAR_DATABASE_PATH || "data/noxgar.sqlite";
 const SESSION_DAYS = Number(process.env.NOXGAR_SESSION_DAYS || 30);
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -104,6 +105,6 @@ async function handle(req, res) {
 
 createServer((req, res) => {
   handle(req, res).catch(error => json(res, 500, { ok: false, error: error.message }));
-}).listen(PORT, "127.0.0.1", () => {
-  console.log(`Noxgar platform API running at http://127.0.0.1:${PORT}`);
+}).listen(PORT, HOST, () => {
+  console.log(`Noxgar platform API running at http://${HOST === "0.0.0.0" ? "127.0.0.1" : HOST}:${PORT}`);
 });

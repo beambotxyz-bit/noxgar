@@ -39,6 +39,11 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
 - Platform API supports verified Telegram Mini App auth, sessions, player profile, wallet, stats, inventory, and settings tables.
 - Added `npm run start:api` and `npm run test:platform`.
 - Initialized local Git repository and pushed `main` to `https://github.com/beambotxyz-bit/noxgar`.
+- Updated local dev hosting so mobile devices on the same LAN can open the client and connect back to the PC game/API servers.
+- Verified LAN mobile testing from `http://192.168.0.229:3000`:
+  - `3000`, `3001`, and `8080` listen on `0.0.0.0`.
+  - Desktop LAN gameplay smoke passed with no console errors.
+  - Mobile landscape 844x390 check passed with visible joystick/action buttons and API base `http://192.168.0.229:3001`.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.
@@ -46,6 +51,6 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - Test changes before moving to the next step.
 
 ## TODO
-- Next recommended step: set up a small project foundation for Telegram auth/database design before adding permanent gems/XP/skin ownership.
-- Add Telegram Mini App auth and database design before gems/XP/skin ownership become real currency.
+- Next recommended step: design the first safe gameplay addition, likely a temporary boost pickup, without changing the core eating/splitting loop.
+- Expand Telegram Mini App auth into real production bot config once the bot token/domain are ready.
 - Install GitHub CLI later if we want richer PR/check workflows from this PC; normal `git push` works.

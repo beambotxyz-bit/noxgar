@@ -28,6 +28,12 @@ Local URLs:
 - Game websocket server: `ws://127.0.0.1:8080`
 - Platform API: `http://127.0.0.1:3001`
 
+For phone testing on the same Wi-Fi/LAN, open the client with your computer's LAN IP, for example:
+
+```text
+http://192.168.0.229:3000
+```
+
 ## Telegram Mini App
 
 Set this environment variable before running the platform API in production:

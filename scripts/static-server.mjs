@@ -4,6 +4,7 @@ import { extname, join, normalize, resolve } from "node:path";
 
 const rootArg = process.argv[2] || "client";
 const port = Number(process.argv[3] || 3000);
+const host = process.argv[4] || "0.0.0.0";
 const root = resolve(rootArg);
 
 const mimeTypes = {
@@ -46,6 +47,6 @@ const server = createServer((req, res) => {
   createReadStream(filePath).pipe(res);
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Client server running at http://127.0.0.1:${port}`);
+server.listen(port, host, () => {
+  console.log(`Client server running at http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${port}`);
 });
