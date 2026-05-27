@@ -38,7 +38,7 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - `docs/telegram-platform.md`
 - Platform API supports verified Telegram Mini App auth, sessions, player profile, wallet, stats, inventory, and settings tables.
 - Added `npm run start:api` and `npm run test:platform`.
-- GitHub note: this PC does not have `gh` installed and the workspace is not yet connected to a remote repository.
+- Initialized local Git repository and pushed `main` to `https://github.com/beambotxyz-bit/noxgar`.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.
@@ -48,4 +48,4 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
 ## TODO
 - Next recommended step: set up a small project foundation for Telegram auth/database design before adding permanent gems/XP/skin ownership.
 - Add Telegram Mini App auth and database design before gems/XP/skin ownership become real currency.
-- Initialize local Git history and connect to a GitHub repository once a repo URL exists or GitHub CLI/auth is available.
+- Install GitHub CLI later if we want richer PR/check workflows from this PC; normal `git push` works.
