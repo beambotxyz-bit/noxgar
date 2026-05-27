@@ -1,0 +1,14 @@
+{
+  "name": "noxgar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Noxgar agar-style multiplayer game base.",
+  "scripts": {
+    "setup": "npm --prefix server install",
+    "start:api": "node platform/api-server.mjs",
+    "start:server": "npm --prefix server start",
+    "start:client": "node scripts/static-server.mjs client 3000",
+    "start": "node scripts/start-dev.mjs",
+    "test:platform": "node --test platform/*.test.mjs"
+  }
+}
