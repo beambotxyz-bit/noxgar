@@ -13,6 +13,9 @@ class PlayerCell extends Cell {
     getSpeed(dist) {
         let speed = 2.2 * Math.pow(this.radius, -0.45) * 40;
         speed *= this.server.config.playerSpeed;
+        if (this.owner && this.server.ticks < (this.owner.noxgarSpeedBoostUntil || 0)) {
+            speed *= this.owner.noxgarSpeedBoostMultiplier || 1;
+        }
         speed = Math.min(dist, speed);
         if (dist != 0) speed /= dist;
         return speed;

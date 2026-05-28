@@ -44,6 +44,18 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - `3000`, `3001`, and `8080` listen on `0.0.0.0`.
   - Desktop LAN gameplay smoke passed with no console errors.
   - Mobile landscape 844x390 check passed with visible joystick/action buttons and API base `http://192.168.0.229:3001`.
+- Pulled Mac/GitHub changes on Windows:
+  - Rare cyan speed boost food pickups.
+  - Mobile touch-lock helper loaded before the main game client.
+  - Mobile audio throttling for pellet/eat sounds.
+  - Mobile deployment notes.
+- Fixed the boost pickup follow-through so active boosts actually multiply `PlayerCell` movement speed.
+- Verification after pulling/fixing:
+  - `node --check` passed for updated client/server files.
+  - `npm run test:platform` passed.
+  - Inline server assertion confirmed active boost speed is exactly `1.35x`.
+  - Desktop LAN gameplay smoke passed through `http://192.168.0.229:3000`.
+  - Mobile landscape 844x390 touch check passed with joystick/buttons visible, touch-lock loaded, and no console errors.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.
