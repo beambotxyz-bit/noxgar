@@ -56,6 +56,15 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - Inline server assertion confirmed active boost speed is exactly `1.35x`.
   - Desktop LAN gameplay smoke passed through `http://192.168.0.229:3000`.
   - Mobile landscape 844x390 touch check passed with joystick/buttons visible, touch-lock loaded, and no console errors.
+- Pulled GitHub update `1d07ec8` on Windows:
+  - Mobile helper now skips tiny fading pellet draw bursts on coarse-pointer devices.
+  - Mobile audio throttling intervals were increased slightly.
+  - Canvas skin drawing sets high image smoothing quality.
+- Verification after the mobile render update:
+  - `node --check client/assets/js/mobile-touch-lock.js` passed.
+  - `npm run test:platform` passed.
+  - Desktop LAN gameplay smoke passed through `http://192.168.0.229:3000`.
+  - Mobile landscape 844x390 check confirmed touch-lock, audio patch, and canvas patch are active with no console errors.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.
