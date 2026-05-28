@@ -18,25 +18,97 @@
 			this.maximum = typeof maximum === 'number' ? maximum : Infinity;
 			this.elms = [];
 			this.lastPlayAt = 0;
-			this.mobileMinInterval = src.includes('pellet') ? 220 : 140;
-			if (IS_MOBILE_LIKE) this.add();
+			this.mobileMinInterval = src.includes('pellet') ? 90 : 180;
+			this.mobileBuffer = null;
+			this.mobileBufferPromise = null;
+			if (IS_MOBILE_LIKE) {
+				Sound.mobileInstances = Sound.mobileInstances || [];
+				Sound.mobileInstances.push(this);
+				this.prepareMobileBuffer();
+			}
 		}
 		play(vol) {
 			if (typeof vol === 'number') this.volume = vol;
-			const now = performance.now ? performance.now() : Date.now();
-			if (IS_MOBILE_LIKE && now - this.lastPlayAt < this.mobileMinInterval) return;
-			this.lastPlayAt = now;
-			const toPlay = IS_MOBILE_LIKE ? this.elms[0] : (this.elms.find((elm) => elm.paused) ?? this.add());
+			if (IS_MOBILE_LIKE) return this.playMobile();
+			const toPlay = this.elms.find((elm) => elm.paused) ?? this.add();
 			toPlay.volume = this.volume;
-			if (IS_MOBILE_LIKE && !toPlay.paused) {
+			// noinspection JSIgnoredPromiseFromCall
+			toPlay.play();
+		}
+		playMobile() {
+			const now = performance.now ? performance.now() : Date.now();
+			if (now - this.lastPlayAt < this.mobileMinInterval) return;
+			this.lastPlayAt = now;
+			const context = Sound.getMobileContext();
+			if (!context) return;
+			if (!this.mobileBuffer) {
+				this.prepareMobileBuffer();
+				return;
+			}
+			if (context.state === 'suspended') {
+				context.resume().catch(() => {});
+				return;
+			}
+			try {
+				const source = context.createBufferSource();
+				const gain = context.createGain();
+				source.buffer = this.mobileBuffer;
+				gain.gain.value = Math.max(0, Math.min(this.volume, 1));
+				source.connect(gain);
+				gain.connect(context.destination);
+				source.onended = () => {
+					source.disconnect();
+					gain.disconnect();
+				};
+				source.start(0);
+			} catch (error) {
+				// If a mobile WebView blocks audio for a moment, skip this sound instead of stalling gameplay.
+			}
+		}
+		prepareMobileBuffer() {
+			const context = Sound.getMobileContext();
+			if (!context || this.mobileBuffer || this.mobileBufferPromise) return;
+			this.mobileBufferPromise = fetch(this.src)
+				.then(response => response.arrayBuffer())
+				.then(data => {
+					try {
+						const decoded = context.decodeAudioData(data.slice(0));
+						if (decoded && typeof decoded.then === 'function') return decoded;
+					} catch (error) {
+						// Older WebViews require the callback form below.
+					}
+					return new Promise((resolve, reject) => context.decodeAudioData(data, resolve, reject));
+				})
+				.then(buffer => {
+					this.mobileBuffer = buffer;
+				})
+				.catch(() => {
+					this.mobileBuffer = null;
+				});
+		}
+		static getMobileContext() {
+			if (!IS_MOBILE_LIKE) return null;
+			if (Sound.mobileContext) return Sound.mobileContext;
+			const AudioContext = window.AudioContext || window.webkitAudioContext;
+			if (!AudioContext) return null;
+			try {
+				Sound.mobileContext = new AudioContext({ latencyHint: 'interactive' });
+			} catch (error) {
 				try {
-					toPlay.currentTime = 0;
+					Sound.mobileContext = new AudioContext();
 				} catch (error) {
-					// Some mobile WebViews reject seeking before enough data is ready.
+					Sound.mobileContext = null;
 				}
 			}
-			// noinspection JSIgnoredPromiseFromCall
-			toPlay.play().catch(() => {});
+			return Sound.mobileContext;
+		}
+		static unlockMobileAudio() {
+			const context = Sound.getMobileContext();
+			if (!context) return;
+			if (context.state === 'suspended') context.resume().catch(() => {});
+			for (const sound of Sound.mobileInstances || []) {
+				sound.prepareMobileBuffer();
+			}
 		}
 		add() {
 			if (this.elms.length >= this.maximum) return this.elms[0];
@@ -2173,6 +2245,7 @@
 		const touchCircle = byId('touchCircle');
 
 		window.addEventListener('touchstart', event => {
+			Sound.unlockMobileAudio();
 			if (settings.disableTouchControls) return;
 
 			if (!touched) {
@@ -2638,6 +2711,7 @@
 		});
 
 		byId('play-btn').addEventListener('click', event => {
+			Sound.unlockMobileAudio();
 			const skin = settings.skin;
 			sendPlay((skin ? `<${skin}>` : '') + settings.nick);
 			hideESCOverlay();

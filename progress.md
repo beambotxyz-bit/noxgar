@@ -82,6 +82,11 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - Mobile reuses one preloaded audio element per sound instead of allocating more audio elements while playing.
   - Own split-cell recombine events are silent on mobile so they do not trigger the heavier eat sound.
   - Mobile smoke check passed at 844x390 with no console errors and stable frame timing.
+- Replaced mobile gameplay sounds with Web Audio after continued pellet micro-freeze reports:
+  - Mobile pellet/eat sounds now decode once into `AudioBuffer`s and play through a single `AudioContext`.
+  - Mobile no longer calls `HTMLAudioElement.play()` for gameplay sounds, avoiding the WebView path that was freezing on pellet eats.
+  - Audio unlock and buffer preparation run on first play/touch gesture for mobile browser compatibility.
+  - 844x390 mobile smoke check confirmed one Web Audio context, zero HTML audio play calls, no console errors, and stable frame timing.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.
