@@ -77,6 +77,11 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - Desktop LAN gameplay smoke passed.
   - Mobile landscape checks passed at 667x375, 844x390, and 932x430 with 2x canvas backing and no console errors.
   - 844x390 mobile frame sampling stayed around 60 FPS in the automated run.
+- Adjusted mobile audio after real-device feedback:
+  - Restored food-dot sound on mobile, but throttled it before `Audio.play()` so it cannot fire for every pellet.
+  - Mobile reuses one preloaded audio element per sound instead of allocating more audio elements while playing.
+  - Own split-cell recombine events are silent on mobile so they do not trigger the heavier eat sound.
+  - Mobile smoke check passed at 844x390 with no console errors and stable frame timing.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.

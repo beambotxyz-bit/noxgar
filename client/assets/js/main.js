@@ -17,17 +17,31 @@
 			this.volume = typeof volume === 'number' ? volume : 0.5;
 			this.maximum = typeof maximum === 'number' ? maximum : Infinity;
 			this.elms = [];
+			this.lastPlayAt = 0;
+			this.mobileMinInterval = src.includes('pellet') ? 220 : 140;
+			if (IS_MOBILE_LIKE) this.add();
 		}
 		play(vol) {
 			if (typeof vol === 'number') this.volume = vol;
-			const toPlay = this.elms.find((elm) => elm.paused) ?? this.add();
+			const now = performance.now ? performance.now() : Date.now();
+			if (IS_MOBILE_LIKE && now - this.lastPlayAt < this.mobileMinInterval) return;
+			this.lastPlayAt = now;
+			const toPlay = IS_MOBILE_LIKE ? this.elms[0] : (this.elms.find((elm) => elm.paused) ?? this.add());
 			toPlay.volume = this.volume;
+			if (IS_MOBILE_LIKE && !toPlay.paused) {
+				try {
+					toPlay.currentTime = 0;
+				} catch (error) {
+					// Some mobile WebViews reject seeking before enough data is ready.
+				}
+			}
 			// noinspection JSIgnoredPromiseFromCall
-			toPlay.play();
+			toPlay.play().catch(() => {});
 		}
 		add() {
 			if (this.elms.length >= this.maximum) return this.elms[0];
 			const elm = new Audio(this.src);
+			elm.preload = 'auto';
 			this.elms.push(elm);
 			return elm;
 		}
@@ -662,8 +676,11 @@
 					const eatenCell = cells.byId.get(killed);
 					const isFoodDot = eatenCell.s <= 20;
 					const instantFoodCleanup = IS_MOBILE_LIKE && isFoodDot;
+					const killerIsMine = cells.mine.includes(killer);
+					const killedIsMine = cells.mine.includes(killed);
+					const ownRecombine = IS_MOBILE_LIKE && killerIsMine && killedIsMine;
 
-					if (settings.playSounds && cells.mine.includes(killer) && !instantFoodCleanup) {
+					if (settings.playSounds && killerIsMine && !ownRecombine) {
 						(isFoodDot ? pelletSound : eatSound).play(parseFloat(soundsVolume.value));
 					}
 
