@@ -1,5 +1,5 @@
 // Prevent mobile browser/WebView page movement while playing Noxgar.
-// Also avoids audio bursts that can cause micro-stutters when eating many pellets.
+// Also reduces mobile render/audio bursts that can cause micro-stutters.
 (function () {
 	'use strict';
 
@@ -7,7 +7,7 @@
 	if (!isMobileLike) return;
 
 	const style = document.createElement('style');
-	style.textContent = 'html,body,#canvas,#mobileStuff,#touch{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important;-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}input,textarea,select,button,#overlays,#gallery{touch-action:manipulation!important}';
+	style.textContent = 'html,body,#canvas,#mobileStuff,#touch{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important;-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}#canvas{image-rendering:auto!important;transform:translateZ(0)}input,textarea,select,button,#overlays,#gallery{touch-action:manipulation!important}';
 	document.head.appendChild(style);
 
 	function isInteractive(target) {
@@ -31,16 +31,13 @@
 			const src = String(this.currentSrc || this.src || '');
 			const now = performance.now ? performance.now() : Date.now();
 
-			// Pellet sounds can fire many times per second while farming food.
-			// Throttling them removes the most common mobile micro-freeze source.
 			if (src.includes('/pellet.') || src.includes('pellet.mp3')) {
-				if (now - lastPelletSoundAt < 180) return Promise.resolve();
+				if (now - lastPelletSoundAt < 220) return Promise.resolve();
 				lastPelletSoundAt = now;
 			}
 
-			// Eating larger cells should still have feedback, but not as an audio burst.
 			if (src.includes('/eat.') || src.includes('eat.mp3')) {
-				if (now - lastEatSoundAt < 90) return Promise.resolve();
+				if (now - lastEatSoundAt < 120) return Promise.resolve();
 				lastEatSoundAt = now;
 			}
 
@@ -52,6 +49,54 @@
 		};
 
 		proto.__noxgarMobileAudioPatched = true;
+	}
+
+	function patchCanvasRendering() {
+		const proto = window.CanvasRenderingContext2D && window.CanvasRenderingContext2D.prototype;
+		if (!proto || proto.__noxgarMobileCanvasPatched) return;
+
+		const originalArc = proto.arc;
+		const originalFill = proto.fill;
+		const originalStroke = proto.stroke;
+		const originalDrawImage = proto.drawImage;
+		const originalResetTransform = proto.resetTransform;
+
+		proto.arc = function (x, y, radius) {
+			this.__noxgarLastArcRadius = Math.abs(radius || 0);
+			return originalArc.apply(this, arguments);
+		};
+
+		function shouldSkipTinyFade(ctx) {
+			// Main.js keeps eaten pellets alive briefly as fading circles. On mobile,
+			// many of those tiny fading pellets can stack up and cause a visible hitch.
+			return ctx.globalAlpha > 0 && ctx.globalAlpha < 0.98 && ctx.__noxgarLastArcRadius > 0 && ctx.__noxgarLastArcRadius < 24;
+		}
+
+		proto.fill = function () {
+			if (shouldSkipTinyFade(this)) return;
+			return originalFill.apply(this, arguments);
+		};
+
+		proto.stroke = function () {
+			if (shouldSkipTinyFade(this)) return;
+			return originalStroke.apply(this, arguments);
+		};
+
+		proto.drawImage = function () {
+			// Keep skins as sharp as the source image allows when scaled/clipped.
+			this.imageSmoothingEnabled = true;
+			if ('imageSmoothingQuality' in this) this.imageSmoothingQuality = 'high';
+			return originalDrawImage.apply(this, arguments);
+		};
+
+		if (originalResetTransform) {
+			proto.resetTransform = function () {
+				this.__noxgarLastArcRadius = 0;
+				return originalResetTransform.apply(this, arguments);
+			};
+		}
+
+		proto.__noxgarMobileCanvasPatched = true;
 	}
 
 	function expandTelegramViewport() {
@@ -74,5 +119,6 @@
 	document.addEventListener('gesturechange', stopPageGesture, options);
 
 	patchMobileAudio();
+	patchCanvasRendering();
 	expandTelegramViewport();
 })();
