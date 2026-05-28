@@ -65,6 +65,18 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - `npm run test:platform` passed.
   - Desktop LAN gameplay smoke passed through `http://192.168.0.229:3000`.
   - Mobile landscape 844x390 check confirmed touch-lock, audio patch, and canvas patch are active with no console errors.
+- Tuned gameplay/performance closer to Agar.io references:
+  - Split launch now uses tracked Noxgar tuning at `splitVelocity: 600`, targeting about 12 visible 50px grid spaces.
+  - Mobile food dots are removed instantly when eaten, avoiding the per-pellet fade draw and pellet sound burst.
+  - Removed global canvas monkey-patching from the mobile helper and kept the audio/touch fixes.
+  - Main canvas now renders at up to 2x device pixel ratio while keeping input math in CSS pixels, improving skin sharpness on mobile.
+- Verification after Agar/mobile tuning:
+  - `node --check` passed for updated client/server files.
+  - `npm run test:platform` passed.
+  - Server tuning assertion confirmed `splitVelocity: 600`.
+  - Desktop LAN gameplay smoke passed.
+  - Mobile landscape checks passed at 667x375, 844x390, and 932x430 with 2x canvas backing and no console errors.
+  - 844x390 mobile frame sampling stayed around 60 FPS in the automated run.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.

@@ -17,6 +17,7 @@ const BotLoader = require('./ai/BotLoader');
 const Gamemode = require('./gamemodes');
 const Packet = require('./packet');
 const UserRoleEnum = require('./enum/UserRoleEnum');
+const noxgarTuning = require('./noxgar-tuning');
 
 // Server implementation
 class Server {
@@ -56,6 +57,7 @@ class Server {
 
         // Config
         this.config = require("./config.js");
+        Object.assign(this.config, noxgarTuning);
         this.ipBanList = [];
         this.minionTest = [];
         this.userList = [];

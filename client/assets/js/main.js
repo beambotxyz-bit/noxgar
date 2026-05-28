@@ -3,6 +3,9 @@
 (function() {
 	'use strict';
 
+	const IS_MOBILE_LIKE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+	const MAX_RENDER_PIXEL_RATIO = 2;
+
 	if (typeof WebSocket === 'undefined' || typeof DataView === 'undefined' || typeof ArrayBuffer === 'undefined' || typeof Uint8Array === 'undefined') {
 		alert('Your browser does not support required features, please update your browser.');
 		window.stop();
@@ -249,7 +252,8 @@
 			this.points = [];
 			this.pointsVel = [];
 		}
-		destroy(killerId) {
+		destroy(killerId, options) {
+			const instant = !!(options && options.instant);
 			cells.byId.delete(this.id);
 
 			if (cells.mine.remove(this.id) && cells.mine.length === 0) {
@@ -258,6 +262,11 @@
 				} else {
 					showESCOverlay();
 				}
+			}
+
+			if (instant) {
+				cells.list.remove(this);
+				return;
 			}
 
 			this.destroyed = true;
@@ -441,6 +450,8 @@
 				if (settings.fillSkin) ctx.fill();
 				ctx.save(); // for the clip
 				ctx.clip();
+				ctx.imageSmoothingEnabled = true;
+				if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
 				ctx.drawImage(skinImage, this.x - this.s, this.y - this.s, this.s * 2, this.s * 2);
 				ctx.restore();
 			} else {
@@ -648,11 +659,15 @@
 					if (!cells.byId.has(killer) || !cells.byId.has(killed))
 						continue;
 
-					if (settings.playSounds && cells.mine.includes(killer)) {
-						(cells.byId.get(killed).s < 20 ? pelletSound : eatSound).play(parseFloat(soundsVolume.value));
+					const eatenCell = cells.byId.get(killed);
+					const isFoodDot = eatenCell.s <= 20;
+					const instantFoodCleanup = IS_MOBILE_LIKE && isFoodDot;
+
+					if (settings.playSounds && cells.mine.includes(killer) && !instantFoodCleanup) {
+						(isFoodDot ? pelletSound : eatSound).play(parseFloat(soundsVolume.value));
 					}
 
-					cells.byId.get(killed).destroy(killer);
+					eatenCell.destroy(killer, { instant: instantFoodCleanup });
 				}
 
 				// update records
@@ -979,6 +994,11 @@
 		sizeScale: 1,
 		scale: 1
 	};
+	const viewport = {
+		width: window.innerWidth,
+		height: window.innerHeight,
+		pixelRatio: 1
+	};
 
 	let ws = null;
 	let reconnectDelay = 1000;
@@ -1086,7 +1106,7 @@
 	}
 
 	function toCamera(ctx) {
-		ctx.translate(mainCanvas.width / 2, mainCanvas.height / 2);
+		ctx.translate(viewport.width / 2, viewport.height / 2);
 		scaleForth(ctx);
 		ctx.translate(-camera.x, -camera.y);
 	}
@@ -1102,7 +1122,7 @@
 	function fromCamera(ctx) {
 		ctx.translate(camera.x, camera.y);
 		scaleBack(ctx);
-		ctx.translate(-mainCanvas.width / 2, -mainCanvas.height / 2);
+		ctx.translate(-viewport.width / 2, -viewport.height / 2);
 	}
 
 	function initSetting(id, elm) {
@@ -1360,8 +1380,8 @@
 		const width = 200 * (border.width / border.height);
 		const height = 40 * (border.height / border.width);
 
-		let beginX = mainCanvas.width / camera.viewportScale - width;
-		let beginY = mainCanvas.height / camera.viewportScale - height;
+		let beginX = viewport.width / camera.viewportScale - width;
+		let beginY = viewport.height / camera.viewportScale - height;
 
 		if (settings.showMinimap) {
 			mainCtx.font = '15px Ubuntu';
@@ -1453,8 +1473,8 @@
 		mainCtx.strokeStyle = settings.darkTheme ? '#aaaaaa' : '#000000';
 		mainCtx.globalAlpha = 0.2;
 		const step = 50;
-		const cW = mainCanvas.width / camera.scale;
-		const cH = mainCanvas.height / camera.scale;
+		const cW = viewport.width / camera.scale;
+		const cH = viewport.height / camera.scale;
 		const startLeft = (-camera.x + cW / 2) % step;
 		const startTop = (-camera.y + cH / 2) % step;
 
@@ -1502,12 +1522,13 @@
 		if (border.centerX !== 0 || border.centerY !== 0 || !settings.showMinimap) return;
 		mainCtx.save();
 		mainCtx.resetTransform();
+		mainCtx.scale(viewport.pixelRatio, viewport.pixelRatio);
 		const targetSize = 200;
 		const borderAR = border.width / border.height; // aspect ratio
 		const width = targetSize * borderAR * camera.viewportScale;
 		const height = targetSize / borderAR * camera.viewportScale;
-		const beginX = mainCanvas.width - width;
-		const beginY = mainCanvas.height - height;
+		const beginX = viewport.width - width;
+		const beginY = viewport.height - height;
 
 		mainCtx.fillStyle = '#000000';
 		mainCtx.globalAlpha = 0.4;
@@ -1615,9 +1636,12 @@
 
 		mainCtx.save();
 		mainCtx.resetTransform();
+		mainCtx.scale(viewport.pixelRatio, viewport.pixelRatio);
+		mainCtx.imageSmoothingEnabled = true;
+		if ('imageSmoothingQuality' in mainCtx) mainCtx.imageSmoothingQuality = 'high';
 
 		mainCtx.fillStyle = settings.bgColor !== '#ffffff' ? settings.bgColor : (settings.darkTheme ? '#111111' : '#f2fbff');
-		mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+		mainCtx.fillRect(0, 0, viewport.width, viewport.height);
 
 		if (settings.showGrid) drawGrid();
 		if (settings.backgroundSectors) drawBackgroundSectors();
@@ -1655,12 +1679,12 @@
 		}
 
 		if (leaderboard.visible) {
-			mainCtx.drawImage(leaderboard.canvas, mainCanvas.width / camera.viewportScale - 10 - leaderboard.canvas.width, 10);
+			mainCtx.drawImage(leaderboard.canvas, viewport.width / camera.viewportScale - 10 - leaderboard.canvas.width, 10);
 		}
 
 		if (settings.showChat && (chat.visible || isTyping)) {
 			mainCtx.globalAlpha = isTyping ? 1 : Math.max(1000 - syncAppStamp + chat.waitUntil, 0) / 1000;
-			mainCtx.drawImage(chat.canvas, 10 / camera.viewportScale, (mainCanvas.height - 55) / camera.viewportScale - chat.canvas.height);
+			mainCtx.drawImage(chat.canvas, 10 / camera.viewportScale, (viewport.height - 55) / camera.viewportScale - chat.canvas.height);
 			mainCtx.globalAlpha = 1;
 		}
 
@@ -1676,7 +1700,7 @@
 			mainCtx.textBaseline = 'hanging';
 			mainCtx.fillStyle = '#eea236';
 			const text = 'You are controlling a minion, press Q to switch back.';
-			mainCtx.fillText(text, mainCanvas.width / 2, 5);
+			mainCtx.fillText(text, viewport.width / 2, 5);
 			mainCtx.restore();
 		}
 
@@ -2568,7 +2592,7 @@
 			const rect = mainCanvas.getBoundingClientRect();
 			const mouseY = event.clientY - rect.top;
 			const scaledMouseY = mouseY / camera.viewportScale;
-			const chatY = (mainCanvas.height - 55) / camera.viewportScale - chat.canvas.height;
+			const chatY = (viewport.height - 55) / camera.viewportScale - chat.canvas.height;
 			const chatLocalY = scaledMouseY - chatY;
 
 			updateChatScrollFromMouse(chatLocalY);
@@ -2632,7 +2656,7 @@
 			const scaledMouseX = chatMouseX / camera.viewportScale;
 			const scaledMouseY = chatMouseY / camera.viewportScale;
 			const chatX = 10 / camera.viewportScale;
-			const chatY = (mainCanvas.height - 55) / camera.viewportScale - chat.canvas.height;
+			const chatY = (viewport.height - 55) / camera.viewportScale - chat.canvas.height;
 			const chatWidth = chat.canvas.width;
 			const chatHeight = chat.canvas.height;
 
@@ -2661,7 +2685,7 @@
 			const scaledMouseY = mouseY / camera.viewportScale;
 
 			const chatX = 10 / camera.viewportScale;
-			const chatY = (mainCanvas.height - 55) / camera.viewportScale - chat.canvas.height;
+			const chatY = (viewport.height - 55) / camera.viewportScale - chat.canvas.height;
 			const chatWidth = chat.canvas.width;
 			const chatHeight = chat.canvas.height;
 
@@ -2688,11 +2712,16 @@
 			}
 		});
 
-		setInterval(() => sendMouseMove((mouseX - mainCanvas.width / 2) / camera.scale + camera.x, (mouseY - mainCanvas.height / 2) / camera.scale + camera.y), 40);
+		setInterval(() => sendMouseMove((mouseX - viewport.width / 2) / camera.scale + camera.x, (mouseY - viewport.height / 2) / camera.scale + camera.y), 40);
 
 		window.onresize = () => {
-			const width = mainCanvas.width = window.innerWidth;
-			const height = mainCanvas.height = window.innerHeight;
+			const width = viewport.width = window.innerWidth;
+			const height = viewport.height = window.innerHeight;
+			const pixelRatio = viewport.pixelRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, MAX_RENDER_PIXEL_RATIO));
+			mainCanvas.style.width = width + 'px';
+			mainCanvas.style.height = height + 'px';
+			mainCanvas.width = Math.max(1, Math.floor(width * pixelRatio));
+			mainCanvas.height = Math.max(1, Math.floor(height * pixelRatio));
 			camera.viewportScale = Math.max(width / 1920, height / 1080);
 		};
 

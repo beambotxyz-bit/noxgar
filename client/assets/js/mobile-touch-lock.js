@@ -51,54 +51,6 @@
 		proto.__noxgarMobileAudioPatched = true;
 	}
 
-	function patchCanvasRendering() {
-		const proto = window.CanvasRenderingContext2D && window.CanvasRenderingContext2D.prototype;
-		if (!proto || proto.__noxgarMobileCanvasPatched) return;
-
-		const originalArc = proto.arc;
-		const originalFill = proto.fill;
-		const originalStroke = proto.stroke;
-		const originalDrawImage = proto.drawImage;
-		const originalResetTransform = proto.resetTransform;
-
-		proto.arc = function (x, y, radius) {
-			this.__noxgarLastArcRadius = Math.abs(radius || 0);
-			return originalArc.apply(this, arguments);
-		};
-
-		function shouldSkipTinyFade(ctx) {
-			// Main.js keeps eaten pellets alive briefly as fading circles. On mobile,
-			// many of those tiny fading pellets can stack up and cause a visible hitch.
-			return ctx.globalAlpha > 0 && ctx.globalAlpha < 0.98 && ctx.__noxgarLastArcRadius > 0 && ctx.__noxgarLastArcRadius < 24;
-		}
-
-		proto.fill = function () {
-			if (shouldSkipTinyFade(this)) return;
-			return originalFill.apply(this, arguments);
-		};
-
-		proto.stroke = function () {
-			if (shouldSkipTinyFade(this)) return;
-			return originalStroke.apply(this, arguments);
-		};
-
-		proto.drawImage = function () {
-			// Keep skins as sharp as the source image allows when scaled/clipped.
-			this.imageSmoothingEnabled = true;
-			if ('imageSmoothingQuality' in this) this.imageSmoothingQuality = 'high';
-			return originalDrawImage.apply(this, arguments);
-		};
-
-		if (originalResetTransform) {
-			proto.resetTransform = function () {
-				this.__noxgarLastArcRadius = 0;
-				return originalResetTransform.apply(this, arguments);
-			};
-		}
-
-		proto.__noxgarMobileCanvasPatched = true;
-	}
-
 	function expandTelegramViewport() {
 		try {
 			if (!window.Telegram || !window.Telegram.WebApp) return;
@@ -119,6 +71,5 @@
 	document.addEventListener('gesturechange', stopPageGesture, options);
 
 	patchMobileAudio();
-	patchCanvasRendering();
 	expandTelegramViewport();
 })();
