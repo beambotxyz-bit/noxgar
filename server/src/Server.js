@@ -57,7 +57,10 @@ class Server {
 
         // Config
         this.config = require("./config.js");
-        Object.assign(this.config, noxgarTuning);
+        this.noxgarTuning = noxgarTuning;
+        for (const key of Object.keys(noxgarTuning)) {
+            if (key in this.config) this.config[key] = noxgarTuning[key];
+        }
         this.ipBanList = [];
         this.minionTest = [];
         this.userList = [];
@@ -517,14 +520,18 @@ class Server {
         if (!move) return; // avoid jittering
         cell.position.add(d.product(move));
         // update remerge
-        var time = this.config.playerRecombineTime, base = Math.max(time, cell.radius * 0.2) * 25;
+        var time = this.config.playerRecombineTime;
+        var massFactor = this.noxgarTuning.playerRecombineMassFactor;
+        var mergeMass = cell.mergeBaseMass || cell._mass;
+        var base = (massFactor ? time + mergeMass / massFactor : Math.max(time, cell.radius * 0.2)) * 25;
         // instant merging conditions
         if (!time || client.rec || client.mergeOverride) {
             cell._canRemerge = cell.boostDistance < 100;
             return; // instant merge
         }
         // regular remerge time
-        cell._canRemerge = cell.getAge() >= base;
+        var age = cell.getMergeAge ? cell.getMergeAge() : cell.getAge();
+        cell._canRemerge = age >= base;
     }
     // decay player cells
     updateSizeDecay(cell) {
@@ -605,8 +612,10 @@ class Server {
             }
         }
         const age = this.config.mobilePhysics ? 1 : 13;
+        const cellAge = m.cell.getMergeAge ? m.cell.getMergeAge() : m.cell.getAge();
+        const checkAge = m.check.getMergeAge ? m.check.getMergeAge() : m.check.getAge();
         // just split => ignore
-        if (m.cell.getAge() < age || m.check.getAge() < age) return false;
+        if (cellAge < age || checkAge < age) return false;
         return !m.cell._canRemerge || !m.check._canRemerge;
     }
     // Resolves rigid body collisions
@@ -636,7 +645,9 @@ class Server {
         if (m.d >= check.radius - cell.radius / div) return; // too far => can't eat
         // collision owned => ignore, resolve, or remerge
         if (cell.owner && cell.owner == check.owner) {
-            if (cell.getAge() < 13 || check.getAge() < 13)
+            const cellAge = cell.getMergeAge ? cell.getMergeAge() : cell.getAge();
+            const checkAge = check.getMergeAge ? check.getMergeAge() : check.getAge();
+            if (cellAge < 13 || checkAge < 13)
                 return; // just split => ignore
         }
         else if (check.radius < cell.radius * 1.15 || !check.canEat(cell))
@@ -656,8 +667,10 @@ class Server {
             return;
         // Remove size from parent cell
         parent.setSize(size1);
+        if (parent.resetMergeTimer) parent.resetMergeTimer();
         // Create cell and add it to node list
         var newCell = new Entity.PlayerCell(this, client, parent.position, size);
+        newCell.resetMergeTimer();
         newCell.setBoost(this.config.splitVelocity * Math.pow(size, 0.0122), angle);
         this.addNode(newCell);
     }

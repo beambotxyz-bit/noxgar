@@ -87,6 +87,15 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - Mobile no longer calls `HTMLAudioElement.play()` for gameplay sounds, avoiding the WebView path that was freezing on pellet eats.
   - Audio unlock and buffer preparation run on first play/touch gesture for mobile browser compatibility.
   - 844x390 mobile smoke check confirmed one Web Audio context, zero HTML audio play calls, no console errors, and stable frame timing.
+- Tuned core physics closer to public Agar.io references:
+  - `server/src/noxgar-tuning.js` now pins player speed to `0.96`, exact ejected mass values of 13 mass created / 18 mass lost, split launch at about 12.6 grid spaces, and recombine timing at `30s + createdCellMass / 50`.
+  - Split cells now reset merge cooldown on both the parent and child cells, so older parent cells cannot merge too generously after a fresh split.
+  - Verification after physics tuning:
+    - `node --check` passed for `server/src/noxgar-tuning.js`, `server/src/entity/PlayerCell.js`, and `server/src/Server.js`.
+    - `npm run test:platform` passed.
+    - Inline server physics check confirmed `playerSpeed: 0.96`, eject mass `13`, eject loss `18`, recombine factor `50`, and split boost about `12.64` grid spaces.
+    - Desktop Playwright smoke passed with screenshot reviewed at `output/physics-tuning-desktop/shot-1.png`.
+    - Mobile 844x390 smoke passed with screenshot reviewed at `output/physics-tuning-mobile/shot-mobile.png`, no console errors, visible controls, and 2x canvas backing.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.
@@ -94,6 +103,7 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - Test changes before moving to the next step.
 
 ## TODO
-- Next recommended step: design the first safe gameplay addition, likely a temporary boost pickup, without changing the core eating/splitting loop.
+- Next recommended step: real-device feel test for the new physics on phone and PC, especially tiny-cell movement, split catch distance, W/eject rhythm, and merge timing after a split.
+- After the feel test, choose one safe gameplay addition to improve, likely boost pickup tuning, without changing the core eating/splitting loop.
 - Expand Telegram Mini App auth into real production bot config once the bot token/domain are ready.
 - Install GitHub CLI later if we want richer PR/check workflows from this PC; normal `git push` works.

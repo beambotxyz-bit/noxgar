@@ -6,6 +6,8 @@ class PlayerCell extends Cell {
         super(server, owner, position, size);
         this.type = 0;
         this._canRemerge = false;
+        this.mergeStartTick = this.createdAt;
+        this.mergeBaseMass = this._mass;
     }
     canEat(cell) {
         return true;
@@ -19,6 +21,14 @@ class PlayerCell extends Cell {
         speed = Math.min(dist, speed);
         if (dist != 0) speed /= dist;
         return speed;
+    }
+    resetMergeTimer() {
+        this.mergeStartTick = this.server.ticks;
+        this.mergeBaseMass = this._mass;
+        this._canRemerge = false;
+    }
+    getMergeAge() {
+        return this.server.ticks - this.mergeStartTick;
     }
     onAdd(server) {
         this.color = this.owner.color;
