@@ -1,4 +1,5 @@
 // Prevent mobile browser/WebView page movement while playing Noxgar.
+// Also avoids audio bursts that can cause micro-stutters when eating many pellets.
 (function () {
 	'use strict';
 
@@ -18,10 +19,60 @@
 		event.preventDefault();
 	}
 
+	function patchMobileAudio() {
+		const proto = window.HTMLMediaElement && window.HTMLMediaElement.prototype;
+		if (!proto || !proto.play || proto.__noxgarMobileAudioPatched) return;
+
+		const originalPlay = proto.play;
+		let lastPelletSoundAt = 0;
+		let lastEatSoundAt = 0;
+
+		proto.play = function () {
+			const src = String(this.currentSrc || this.src || '');
+			const now = performance.now ? performance.now() : Date.now();
+
+			// Pellet sounds can fire many times per second while farming food.
+			// Throttling them removes the most common mobile micro-freeze source.
+			if (src.includes('/pellet.') || src.includes('pellet.mp3')) {
+				if (now - lastPelletSoundAt < 180) return Promise.resolve();
+				lastPelletSoundAt = now;
+			}
+
+			// Eating larger cells should still have feedback, but not as an audio burst.
+			if (src.includes('/eat.') || src.includes('eat.mp3')) {
+				if (now - lastEatSoundAt < 90) return Promise.resolve();
+				lastEatSoundAt = now;
+			}
+
+			try {
+				return originalPlay.apply(this, arguments);
+			} catch (error) {
+				return Promise.resolve();
+			}
+		};
+
+		proto.__noxgarMobileAudioPatched = true;
+	}
+
+	function expandTelegramViewport() {
+		try {
+			if (!window.Telegram || !window.Telegram.WebApp) return;
+			window.Telegram.WebApp.expand();
+			if (typeof window.Telegram.WebApp.disableVerticalSwipes === 'function') {
+				window.Telegram.WebApp.disableVerticalSwipes();
+			}
+		} catch (error) {
+			// Ignore older Telegram clients that do not support every method.
+		}
+	}
+
 	const options = { capture: true, passive: false };
 	document.addEventListener('touchstart', stopPageGesture, options);
 	document.addEventListener('touchmove', stopPageGesture, options);
 	document.addEventListener('touchend', stopPageGesture, options);
 	document.addEventListener('gesturestart', stopPageGesture, options);
 	document.addEventListener('gesturechange', stopPageGesture, options);
+
+	patchMobileAudio();
+	expandTelegramViewport();
 })();
