@@ -325,6 +325,10 @@ class Player {
         return this.spectateTarget ?? this.server.largestClient;
     }
     setCenterPos(p) {
+        if (this.server.isCircularArena && this.server.isCircularArena()) {
+            this.centerPos = this.server.clampPointToArena(p, 0);
+            return;
+        }
         p.x = Math.max(p.x, this.server.border.minx);
         p.y = Math.max(p.y, this.server.border.miny);
         p.x = Math.min(p.x, this.server.border.maxx);

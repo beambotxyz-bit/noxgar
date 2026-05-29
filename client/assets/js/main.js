@@ -431,7 +431,7 @@
 
 				let affected = quadtree.some({ x: curP.x - 5, y: curP.y - 5, w: 10, h: 10 }, item => item.parent !== this && sqDist(item, curP) <= 25);
 
-				if (!affected && (curP.x < border.left || curP.y < border.top || curP.x > border.right || curP.y > border.bottom)) {
+				if (!affected && isPointOutsideArena(curP)) {
 					affected = true;
 				}
 
@@ -1088,6 +1088,19 @@
 		height: window.innerHeight,
 		pixelRatio: 1
 	};
+	const ARENA_VISUALS = Object.freeze({
+		circular: true,
+		backgroundOuter: '#01030a',
+		backgroundInner: '#071523',
+		ring: 'rgba(73, 225, 255, 0.18)',
+		ringMajor: 'rgba(117, 241, 255, 0.34)',
+		spoke: 'rgba(73, 225, 255, 0.12)',
+		center: 'rgba(140, 251, 255, 0.68)',
+		centerFill: 'rgba(45, 195, 255, 0.08)',
+		ringStep: 500,
+		majorEvery: 4,
+		spokes: 24
+	});
 
 	let ws = null;
 	let reconnectDelay = 1000;
@@ -1121,7 +1134,7 @@
 		gamemode: '',
 		showSkins: true,
 		showNames: true,
-		darkTheme: false,
+		darkTheme: true,
 		showColor: true,
 		showMass: false,
 		_showChat: true,
@@ -1134,9 +1147,9 @@
 			a ? chatBox.show() : chatBox.hide();
 			a ? chatClear.show() : chatClear.hide();
 		},
-		showMinimap: true,
+		showMinimap: false,
 		showPosition: false,
-		showBorder: false,
+		showBorder: true,
 		showGrid: true,
 		playSounds: true,
 		soundsVolume: 0.5,
@@ -1149,7 +1162,7 @@
 		transparentAlpha: 0.75,
 		feedMacro: true,
 		splitMacro: true,
-		bgColor: '#ffffff',
+		bgColor: '#05070d',
 		nameColor: '#ffffff',
 		cellColor: '#ffffff',
 		borderColor: '#ffffff',
@@ -1255,6 +1268,22 @@
 				if (Object.hasOwnProperty.call(obj, prop)) settings[prop] = obj[prop];
 				initSetting(prop, elm);
 			} else Logger.info(`setting ${prop} not loaded because there is no element for it.`);
+		}
+
+		settings.darkTheme = true;
+		settings.showMinimap = false;
+		settings.showBorder = true;
+		settings.showGrid = true;
+		settings.backgroundSectors = false;
+		settings.bgColor = '#05070d';
+		const forcedControls = {
+			darkTheme: 'checked',
+			showGrid: 'checked',
+			bgColor: 'value'
+		};
+		for (const id in forcedControls) {
+			const elm = byId(id);
+			if (elm) elm[forcedControls[id]] = settings[id];
 		}
 	}
 
@@ -1457,7 +1486,7 @@
 		canvas.width = width;
 		canvas.height = rows.length * (14 + 2);
 		ctx.font = '14px Ubuntu';
-		ctx.fillStyle = settings.darkTheme ? '#aaaaaa' : '#555555';
+		ctx.fillStyle = ARENA_VISUALS.circular ? '#c7d5e6' : (settings.darkTheme ? '#aaaaaa' : '#555555');
 		ctx.textBaseline = 'top';
 		for (let i = 0; i < rows.length; i++) {
 			ctx.fillText(rows[i], 2, -1 + i * (14 + 2));
@@ -1556,7 +1585,64 @@
 		}
 	}
 
+	function getArenaInfo() {
+		const width = border.width || border.right - border.left || 0;
+		const height = border.height || border.bottom - border.top || 0;
+		return {
+			x: Number.isFinite(border.centerX) ? border.centerX : (border.left + border.right) / 2,
+			y: Number.isFinite(border.centerY) ? border.centerY : (border.top + border.bottom) / 2,
+			radius: Math.max(0, Math.min(width, height) / 2)
+		};
+	}
+
+	function isPointOutsideArena(point) {
+		if (!ARENA_VISUALS.circular) {
+			return point.x < border.left || point.y < border.top || point.x > border.right || point.y > border.bottom;
+		}
+		const arena = getArenaInfo();
+		if (!arena.radius) return false;
+		return Math.hypot(point.x - arena.x, point.y - arena.y) > arena.radius;
+	}
+
+	function getWorldViewRadius() {
+		const cW = viewport.width / camera.scale;
+		const cH = viewport.height / camera.scale;
+		return Math.hypot(cW, cH) / 2;
+	}
+
+	function isArenaEdgeNearView(extraPx = 0) {
+		const arena = getArenaInfo();
+		if (!arena.radius) return false;
+		const distanceFromCenter = Math.hypot(camera.x - arena.x, camera.y - arena.y);
+		return distanceFromCenter + getWorldViewRadius() >= arena.radius - extraPx / camera.scale;
+	}
+
+	function drawArenaBackground() {
+		if (!ARENA_VISUALS.circular) return;
+		const arena = getArenaInfo();
+		if (!arena.radius) return;
+
+		mainCtx.save();
+		toCamera(mainCtx);
+		const gradient = mainCtx.createRadialGradient(
+			arena.x, arena.y, arena.radius * 0.05,
+			arena.x, arena.y, arena.radius
+		);
+		gradient.addColorStop(0, ARENA_VISUALS.backgroundInner);
+		gradient.addColorStop(0.72, '#030912');
+		gradient.addColorStop(1, ARENA_VISUALS.backgroundOuter);
+		mainCtx.fillStyle = gradient;
+		mainCtx.beginPath();
+		mainCtx.arc(arena.x, arena.y, arena.radius, 0, PI_2);
+		mainCtx.fill();
+		mainCtx.restore();
+	}
+
 	function drawGrid() {
+		if (ARENA_VISUALS.circular) {
+			drawRadarRings();
+			return;
+		}
 		mainCtx.save();
 		mainCtx.lineWidth = 1;
 		mainCtx.strokeStyle = settings.darkTheme ? '#aaaaaa' : '#000000';
@@ -1581,7 +1667,56 @@
 		mainCtx.restore();
 	}
 
+	function drawRadarRings() {
+		const arena = getArenaInfo();
+		if (!arena.radius) return;
+
+		mainCtx.save();
+		mainCtx.lineCap = 'round';
+		mainCtx.lineJoin = 'round';
+
+		const lineWidth = Math.max(1 / camera.scale, 0.5);
+		const viewRadius = getWorldViewRadius();
+		const cameraDistance = Math.hypot(camera.x - arena.x, camera.y - arena.y);
+		const minVisibleRing = Math.max(0, cameraDistance - viewRadius - ARENA_VISUALS.ringStep);
+		const maxVisibleRing = Math.min(arena.radius, cameraDistance + viewRadius + ARENA_VISUALS.ringStep);
+
+		for (let r = ARENA_VISUALS.ringStep; r < arena.radius; r += ARENA_VISUALS.ringStep) {
+			if (r < minVisibleRing || r > maxVisibleRing) continue;
+			mainCtx.beginPath();
+			mainCtx.lineWidth = (r / ARENA_VISUALS.ringStep) % ARENA_VISUALS.majorEvery === 0 ? 1.6 / camera.scale : lineWidth;
+			mainCtx.strokeStyle = (r / ARENA_VISUALS.ringStep) % ARENA_VISUALS.majorEvery === 0 ? ARENA_VISUALS.ringMajor : ARENA_VISUALS.ring;
+			mainCtx.arc(arena.x, arena.y, r, 0, PI_2);
+			mainCtx.stroke();
+		}
+
+		mainCtx.beginPath();
+		mainCtx.lineWidth = lineWidth;
+		mainCtx.strokeStyle = ARENA_VISUALS.spoke;
+		for (let i = 0; i < ARENA_VISUALS.spokes; i++) {
+			const angle = i / ARENA_VISUALS.spokes * PI_2;
+			mainCtx.moveTo(arena.x, arena.y);
+			mainCtx.lineTo(
+				arena.x + Math.cos(angle) * arena.radius,
+				arena.y + Math.sin(angle) * arena.radius
+			);
+		}
+		mainCtx.stroke();
+
+		const centerRadius = 150;
+		mainCtx.beginPath();
+		mainCtx.lineWidth = 3 / camera.scale;
+		mainCtx.strokeStyle = ARENA_VISUALS.center;
+		mainCtx.fillStyle = ARENA_VISUALS.centerFill;
+		mainCtx.arc(arena.x, arena.y, centerRadius, 0, PI_2);
+		mainCtx.fill();
+		mainCtx.stroke();
+
+		mainCtx.restore();
+	}
+
 	function drawBackgroundSectors() {
+		if (ARENA_VISUALS.circular) return;
 		if (border === undefined || border.width === undefined) return;
 		mainCtx.save();
 
@@ -1607,90 +1742,12 @@
 		mainCtx.restore();
 	}
 
-	function drawMinimap() {
-		if (border.centerX !== 0 || border.centerY !== 0 || !settings.showMinimap) return;
-		mainCtx.save();
-		mainCtx.resetTransform();
-		mainCtx.scale(viewport.pixelRatio, viewport.pixelRatio);
-		const targetSize = 200;
-		const borderAR = border.width / border.height; // aspect ratio
-		const width = targetSize * borderAR * camera.viewportScale;
-		const height = targetSize / borderAR * camera.viewportScale;
-		const beginX = viewport.width - width;
-		const beginY = viewport.height - height;
-
-		mainCtx.fillStyle = '#000000';
-		mainCtx.globalAlpha = 0.4;
-		mainCtx.fillRect(beginX, beginY, width, height);
-		mainCtx.globalAlpha = 1;
-
-		const sectorCount = 5;
-		const sectorNames = ['ABCDE', '12345'];
-		const sectorWidth = width / sectorCount;
-		const sectorHeight = height / sectorCount;
-		const sectorNameSize = Math.min(sectorWidth, sectorHeight) / 3;
-
-		mainCtx.fillStyle = settings.darkTheme ? '#666666' : '#dddddd';
-		mainCtx.textBaseline = 'middle';
-		mainCtx.textAlign = 'center';
-		mainCtx.font = `${sectorNameSize}px Ubuntu`;
-
-		for (let i = 0; i < sectorCount; i++) {
-			const x = (i + 0.5) * sectorWidth;
-			for (let j = 0; j < sectorCount; j++) {
-				const y = (j + 0.5) * sectorHeight;
-				mainCtx.fillText(sectorNames[0][i] + sectorNames[1][j], beginX + x, beginY + y);
-			}
-		}
-
-		const xScale = width / border.width;
-		const yScale = height / border.height;
-		const halfWidth = border.width / 2;
-		const halfHeight = border.height / 2;
-		const myPosX = beginX + (camera.x + halfWidth) * xScale;
-		const myPosY = beginY + (camera.y + halfHeight) * yScale;
-
-		const xIndex = (myPosX - beginX) / sectorWidth | 0;
-		const yIndex = (myPosY - beginY) / sectorHeight | 0;
-		const lightX = beginX + xIndex * sectorWidth;
-		const lightY = beginY + yIndex * sectorHeight;
-		mainCtx.fillStyle = 'yellow';
-		mainCtx.globalAlpha = 0.3;
-		mainCtx.fillRect(lightX, lightY, sectorWidth, sectorHeight);
-		mainCtx.globalAlpha = 1;
-
-		mainCtx.beginPath();
-		if (cells.mine.length) {
-			for (const id of cells.mine) {
-				const cell = cells.byId.get(id);
-				if (!cell) continue;
-				mainCtx.fillStyle = cell.color.toHex(); // repeat assignment of same color is OK
-				const x = beginX + (cell.x + halfWidth) * xScale;
-				const y = beginY + (cell.y + halfHeight) * yScale;
-				const r = Math.max(cell.s, 200) * (xScale + yScale) / 2;
-				mainCtx.moveTo(x + r, y);
-				mainCtx.arc(x, y, r, 0, PI_2);
-			}
-		} else {
-			mainCtx.fillStyle = '#ffaaaa';
-			mainCtx.arc(myPosX, myPosY, 5, 0, PI_2);
-		}
-		mainCtx.fill();
-
-		// draw name above user's pos if they have a cell on the screen
-		const cell = cells.byId.get(cells.mine.find(id => cells.byId.has(id)));
-
-		if (cell) {
-			mainCtx.fillStyle = settings.showColor && typeof cell['nameColor'] !== 'undefined' && cell.nameColor !== '' && cell.nameColor !== null ? cell.nameColor.toHex() : (settings.darkTheme ? '#dddddd' : '#222222');
-			mainCtx.font = `${sectorNameSize}px Ubuntu`;
-			mainCtx.fillText(cell.name || EMPTY_NAME, myPosX, myPosY - 7 - sectorNameSize / 2);
-		}
-
-		mainCtx.restore();
-	}
-
 	function drawBorders() {
 		if (!settings.showBorder) return;
+		if (ARENA_VISUALS.circular) {
+			drawFireArenaBorder();
+			return;
+		}
 		mainCtx.strokeStyle = '#0000ff';
 		mainCtx.lineWidth = 20;
 		mainCtx.lineCap = 'round';
@@ -1702,6 +1759,55 @@
 		mainCtx.lineTo(border.left, border.bottom);
 		mainCtx.closePath();
 		mainCtx.stroke();
+	}
+
+	function drawFireArenaBorder() {
+		const arena = getArenaInfo();
+		if (!arena.radius || !isArenaEdgeNearView(220)) return;
+
+		const t = syncAppStamp / 1000;
+		const px = value => value / camera.scale;
+
+		mainCtx.save();
+		mainCtx.lineCap = 'round';
+		mainCtx.lineJoin = 'round';
+
+		const strokeCircle = (lineWidth, strokeStyle, shadowColor, shadowBlur) => {
+			mainCtx.beginPath();
+			mainCtx.lineWidth = px(lineWidth);
+			mainCtx.strokeStyle = strokeStyle;
+			mainCtx.shadowColor = shadowColor;
+			mainCtx.shadowBlur = px(shadowBlur);
+			mainCtx.arc(arena.x, arena.y, arena.radius, 0, PI_2);
+			mainCtx.stroke();
+		};
+
+		strokeCircle(46, 'rgba(96, 10, 0, 0.46)', 'rgba(255, 48, 0, 0.45)', 28);
+		strokeCircle(27, 'rgba(255, 70, 0, 0.58)', 'rgba(255, 88, 0, 0.56)', 18);
+		strokeCircle(10, 'rgba(255, 188, 70, 0.86)', 'rgba(255, 175, 54, 0.62)', 10);
+		strokeCircle(3.5, 'rgba(255, 245, 196, 0.88)', 'rgba(255, 236, 160, 0.5)', 5);
+
+		const segments = IS_MOBILE_LIKE ? 72 : 112;
+		mainCtx.shadowBlur = px(IS_MOBILE_LIKE ? 5 : 8);
+		mainCtx.shadowColor = 'rgba(255, 118, 0, 0.72)';
+		mainCtx.lineWidth = px(IS_MOBILE_LIKE ? 2.2 : 2.6);
+
+		for (let i = 0; i < segments; i++) {
+			const angle = i / segments * PI_2;
+			const flicker = 0.5 + 0.25 * Math.sin(i * 2.41 + t * 6.3) + 0.25 * Math.sin(i * 7.13 - t * 4.7);
+			const inner = arena.radius - px(9 + flicker * 8);
+			const outer = arena.radius + px(12 + flicker * 28);
+			const x = Math.cos(angle);
+			const y = Math.sin(angle);
+
+			mainCtx.beginPath();
+			mainCtx.strokeStyle = flicker > 0.62 ? 'rgba(255, 230, 126, 0.78)' : 'rgba(255, 90, 0, 0.62)';
+			mainCtx.moveTo(arena.x + x * inner, arena.y + y * inner);
+			mainCtx.lineTo(arena.x + x * outer, arena.y + y * outer);
+			mainCtx.stroke();
+		}
+
+		mainCtx.restore();
 	}
 
 	function drawGame() {
@@ -1729,8 +1835,9 @@
 		mainCtx.imageSmoothingEnabled = true;
 		if ('imageSmoothingQuality' in mainCtx) mainCtx.imageSmoothingQuality = 'high';
 
-		mainCtx.fillStyle = settings.bgColor !== '#ffffff' ? settings.bgColor : (settings.darkTheme ? '#111111' : '#f2fbff');
+		mainCtx.fillStyle = ARENA_VISUALS.circular ? ARENA_VISUALS.backgroundOuter : (settings.bgColor !== '#ffffff' ? settings.bgColor : (settings.darkTheme ? '#111111' : '#f2fbff'));
 		mainCtx.fillRect(0, 0, viewport.width, viewport.height);
+		drawArenaBackground();
 
 		if (settings.showGrid) drawGrid();
 		if (settings.backgroundSectors) drawBackgroundSectors();
@@ -1747,7 +1854,7 @@
 		mainCtx.scale(camera.viewportScale, camera.viewportScale);
 
 		let height = 2;
-		mainCtx.fillStyle = settings.darkTheme ? '#ffffff' : '#000000';
+		mainCtx.fillStyle = ARENA_VISUALS.circular ? '#f4f8ff' : (settings.darkTheme ? '#ffffff' : '#000000');
 		mainCtx.textBaseline = 'top';
 
 		if (!isNaN(stats.score)) {
@@ -1777,7 +1884,6 @@
 			mainCtx.globalAlpha = 1;
 		}
 
-		drawMinimap();
 		drawPosition();
 
 		mainCtx.restore();
@@ -1795,6 +1901,40 @@
 
 		cacheCleanup();
 		window.requestAnimationFrame(drawGame);
+	}
+
+	function renderGameToText() {
+		const arena = getArenaInfo();
+		const mine = cells.mine
+			.map(id => cells.byId.get(id))
+			.filter(Boolean)
+			.map(cell => ({
+				x: Math.round(cell.x),
+				y: Math.round(cell.y),
+				radius: Math.round(cell.s),
+				mass: Math.round(cell.s * cell.s / 100)
+			}));
+
+		return JSON.stringify({
+			coordinateSystem: 'world origin at arena center, x right, y down',
+			arena: {
+				circular: ARENA_VISUALS.circular,
+				radius: Math.round(arena.radius),
+				center: { x: Math.round(arena.x), y: Math.round(arena.y) },
+				minimap: false,
+				radarRings: !!settings.showGrid
+			},
+			camera: {
+				x: Math.round(camera.x),
+				y: Math.round(camera.y),
+				scale: Number(camera.scale.toFixed(3))
+			},
+			player: {
+				score: Number.isFinite(stats.score) ? stats.score : null,
+				cells: mine
+			},
+			visibleCells: cells.list.length
+		});
 	}
 
 	function drawSkinPreview(url, canvas) {
@@ -2965,5 +3105,6 @@
 		}
 	}
 
+	window.render_game_to_text = renderGameToText;
 	window.addEventListener('DOMContentLoaded', start);
 })();

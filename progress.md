@@ -96,6 +96,19 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
     - Inline server physics check confirmed `playerSpeed: 0.96`, eject mass `13`, eject loss `18`, recombine factor `50`, and split boost about `12.64` grid spaces.
     - Desktop Playwright smoke passed with screenshot reviewed at `output/physics-tuning-desktop/shot-1.png`.
     - Mobile 844x390 smoke passed with screenshot reviewed at `output/physics-tuning-mobile/shot-mobile.png`, no console errors, visible controls, and 2x canvas backing.
+- Reworked the arena into a circular black radar map:
+  - Server now uses a real circular arena while keeping the old square map area by increasing the bounding diameter to about `15957.69` and using a playable radius of about `7978.85`.
+  - Random food/virus/player spawns are sampled inside the circle, player/spectator positions clamp inside it, and boosted/split/ejected cells reflect from the circular boundary.
+  - Client minimap UI and minimap drawing were removed; settings now show `Radar Rings` instead of the old square grid/minimap controls.
+  - Canvas visuals now use a black circular arena, radar rings/spokes, a center circle, and a performance-aware fire border near the circular edge.
+  - Added `window.render_game_to_text()` for automated checks to report arena/player/camera state.
+  - Verification after circular arena pass:
+    - `node --check` passed for updated client/server files.
+    - `npm run test:platform` passed.
+    - Inline server assertion confirmed circular arena enabled, area ratio `1.0000`, zero random spawns outside the circle, and boost reflection at the edge.
+    - Desktop live gameplay smoke passed with screenshot reviewed at `output/circular-arena-desktop-final-play/shot-1.png`.
+    - Mobile 844x390 live gameplay smoke passed with screenshot reviewed at `output/circular-arena-mobile-final/shot-mobile.png`, no console errors, no minimap settings text, visible radar rings, and 2x canvas backing.
+    - Near-edge visual check passed with fire border screenshot reviewed at `output/circular-arena-edge/shot-edge-driven-fixed2.png`.
 - Key project rules:
   - Preserve core gameplay and change slowly.
   - Mobile landscape gameplay is critical.
@@ -103,7 +116,8 @@ Original prompt: Build an online agar.io-inspired multiplayer game with boosts a
   - Test changes before moving to the next step.
 
 ## TODO
-- Next recommended step: real-device feel test for the new physics on phone and PC, especially tiny-cell movement, split catch distance, W/eject rhythm, and merge timing after a split.
+- Next recommended step: real-device feel test for the circular arena on phone and PC, especially visibility of radar rings, fire border clarity near the edge, movement/split/eject behavior at the circular boundary, and whether top-left HUD needs more protection from large virus/cell overlap.
+- Also continue the physics feel test, especially tiny-cell movement, split catch distance, W/eject rhythm, and merge timing after a split.
 - After the feel test, choose one safe gameplay addition to improve, likely boost pickup tuning, without changing the core eating/splitting loop.
 - Expand Telegram Mini App auth into real production bot config once the bot token/domain are ready.
 - Install GitHub CLI later if we want richer PR/check workflows from this PC; normal `git push` works.

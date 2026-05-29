@@ -60,6 +60,13 @@ class Cell {
     }
     // Prevent cell from crossing the border
     checkBorder(b) {
+        if (this.server && this.server.isCircularArena && this.server.isCircularArena()) {
+            this.server.clampNodeToArena(this);
+            return;
+        }
+        this.checkSquareBorder(b);
+    }
+    checkSquareBorder(b) {
         const r = this.radius / 2;
         if (this.position.x < b.minx + r || this.position.x > b.maxx - r) {
             this.boostDirection.x *= -1; // Reflect left-right

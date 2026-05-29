@@ -313,6 +313,66 @@ class Server {
         this.border = new Quad(-hw, -hh, hw, hh);
         this.border.width = width;
         this.border.height = height;
+        this.border.centerX = 0;
+        this.border.centerY = 0;
+        this.border.radius = Math.min(hw, hh);
+        this.border.circular = !!this.noxgarTuning.circularArena;
+    }
+    isCircularArena() {
+        return !!(this.border && this.border.circular);
+    }
+    clampPointToArena(point, radius) {
+        if (!this.isCircularArena()) {
+            point.x = Math.max(point.x, this.border.minx + radius / 2);
+            point.y = Math.max(point.y, this.border.miny + radius / 2);
+            point.x = Math.min(point.x, this.border.maxx - radius / 2);
+            point.y = Math.min(point.y, this.border.maxy - radius / 2);
+            return point;
+        }
+
+        var cx = this.border.centerX || 0;
+        var cy = this.border.centerY || 0;
+        var dx = point.x - cx;
+        var dy = point.y - cy;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var maxDist = Math.max(0, this.border.radius - radius / 2);
+
+        if (dist > maxDist) {
+            if (!dist) {
+                point.x = cx;
+                point.y = cy;
+            } else {
+                point.x = cx + dx / dist * maxDist;
+                point.y = cy + dy / dist * maxDist;
+            }
+        }
+        return point;
+    }
+    clampNodeToArena(node) {
+        if (!this.isCircularArena()) {
+            node.checkSquareBorder(this.border);
+            return;
+        }
+
+        var cx = this.border.centerX || 0;
+        var cy = this.border.centerY || 0;
+        var dx = node.position.x - cx;
+        var dy = node.position.y - cy;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var maxDist = Math.max(0, this.border.radius - node.radius / 2);
+
+        if (dist <= maxDist) return;
+
+        var nx = dist ? dx / dist : 1;
+        var ny = dist ? dy / dist : 0;
+        node.position.x = cx + nx * maxDist;
+        node.position.y = cy + ny * maxDist;
+
+        var dot = node.boostDirection.x * nx + node.boostDirection.y * ny;
+        if (dot > 0) {
+            node.boostDirection.x -= 2 * dot * nx;
+            node.boostDirection.y -= 2 * dot * ny;
+        }
     }
     getRandomColor() {
         // get random
@@ -674,7 +734,15 @@ class Server {
         newCell.setBoost(this.config.splitVelocity * Math.pow(size, 0.0122), angle);
         this.addNode(newCell);
     }
-    randomPos() {
+    randomPos(radius = 0) {
+        if (this.isCircularArena()) {
+            var angle = Math.random() * 2 * Math.PI;
+            var distance = Math.sqrt(Math.random()) * Math.max(0, this.border.radius - radius / 2);
+            return new Vec2(
+                (this.border.centerX || 0) + Math.cos(angle) * distance,
+                (this.border.centerY || 0) + Math.sin(angle) * distance
+            );
+        }
         return new Vec2(this.border.minx + this.border.width * Math.random(),
             this.border.miny + this.border.height * Math.random());
     }
@@ -683,19 +751,20 @@ class Server {
 
         var spawnSuccess = false;
         var attempts = 0;
+        this.clampPointToArena(cell.position, cell.radius);
         while (!spawnSuccess && attempts < maxAttempts) {
             if (!this.willCollide(cell)) {
                 spawnSuccess = true;
             }
             else {
-                cell.position = this.randomPos();
+                cell.position = this.randomPos(cell.radius);
                 attempts++;
             }
         }
         this.addNode(cell);
     }
     spawnFood() {
-        var cell = new Entity.Food(this, null, this.randomPos(), this.config.foodMinSize);
+        var cell = new Entity.Food(this, null, this.randomPos(this.config.foodMinSize), this.config.foodMinSize);
         if (this.config.foodMassGrow) {
             var maxGrow = this.config.foodMaxSize - cell.radius;
             cell.setSize(cell.radius += maxGrow * Math.random());
@@ -704,7 +773,7 @@ class Server {
         this.addNode(cell);
     }
     spawnVirus() {
-        var virus = new Entity.Virus(this, null, this.randomPos(), this.config.virusMinSize);
+        var virus = new Entity.Virus(this, null, this.randomPos(this.config.virusMinSize), this.config.virusMinSize);
         this.safeSpawn(virus);
 
     }
@@ -733,6 +802,7 @@ class Server {
             player.color = eject.color;
             size = Math.max(size, eject.radius * 1.15);
         }
+        pos = this.clampPointToArena(pos, size);
         // Spawn player safely (do not check minions)
         var cell = new Entity.PlayerCell(this, player, pos, size);
         player.isMi ? this.addNode(cell) : this.safeSpawn(cell);
@@ -792,6 +862,7 @@ class Server {
 
             // Get starting position
             var pos = cell.position.sum(d.product(cell.radius));
+            this.clampPointToArena(pos, this.config.ejectSize);
             var angle = d.angle() + (Math.random() * .6) - .3;
             // Create cell and add it to node list
             var ejected;
